@@ -1,0 +1,130 @@
+# YouTube Downloader - .gitignore
+# Only keep deployment-ready files, exclude downloads and temporary files
+
+# Downloaded Videos and Media Files
+downloads/
+*.mp4
+*.mkv
+*.webm
+*.m4a
+*.mp3
+*.wav
+*.flac
+*.aac
+*.ogg
+*.3gp
+*.avi
+*.mov
+*.wmv
+*.flv
+*.f4v
+
+# Temporary and Cache Files
+temp_downloads/
+*.tmp
+*.temp
+.cache/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.pytest_cache/
+
+# Python Virtual Environment
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE and Editor Files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Operating System Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Logs and Debug Files
+*.log
+*.out
+*.err
+debug.log
+error.log
+
+# Configuration Files with Sensitive Data
+config.ini
+settings.json
+secrets.json
+.env
+.env.local
+.env.*.local
+
+# Backup Files
+*.bak
+*.backup
+*.old
+*~
+
+# Compiled Files
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Package Files
+*.egg-info/
+dist/
+build/
+*.wheel
+
+# Jupyter Notebook Checkpoints
+.ipynb_checkpoints
+
+# Test Coverage Reports
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Temporary Code Runner Files
+tempCodeRunnerFile.*
+
+# FFmpeg binaries (if included)
+ffmpeg/
+ffmpeg.exe
+ffprobe.exe
+
+# YT-DLP cache and cookies
+.yt-dlp-cache/
+cookies.txt
+
+# Windows specific
+*.lnk
+
+# macOS specific
+.AppleDouble
+.LSOverride
+
+# Linux specific
+*~
+
+# Keep these essential files for deployment:
+# bulletproof_downloader.py
+# README_BULLETPROOF.md
+# requirements.txt (if created)
+# LICENSE (if added)
+# .gitignore (this file)
