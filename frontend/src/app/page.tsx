@@ -359,35 +359,6 @@ const handleDownload = async () => {
         }
         throw new Error(errorMessage);
       }
-      }      const info = await infoResponse.json();
-      setVideoInfo(info);
-      setIsLoadingInfo(false);
-      setDownloadStatus('Preparing download...');
-      setDownloadProgress(25);
-
-      // Then start the actual download
-      const downloadResponse = await fetch('/api/download', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          url: url.trim(),
-          infoOnly: false
-        }),
-      });
-
-      if (!downloadResponse.ok) {
-        const errorText = await downloadResponse.text();
-        let errorMessage = 'Download failed';
-        try {
-          const errorJson = JSON.parse(errorText);
-          errorMessage = errorJson.error || errorMessage;
-        } catch {
-          errorMessage = errorText || errorMessage;
-        }
-        throw new Error(errorMessage);
-      }
 
       setDownloadProgress(75);
       setDownloadStatus('Processing download...');
@@ -416,7 +387,9 @@ const handleDownload = async () => {
       a.download = filename;
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);      window.URL.revokeObjectURL(downloadUrl);
+      document.body.removeChild(a);
+
+      window.URL.revokeObjectURL(downloadUrl);
 
       setDownloadProgress(100);
       setDownloadStatus('Download completed!');
@@ -445,9 +418,12 @@ const handleDownload = async () => {
       }, 5000); // Show error longer
     }
   };
+
   if (isLoading) {
     return <ModernLoader />;
-  }return (
+  }
+
+  return (
     <main className="relative bg-black text-white h-screen overflow-y-scroll scroll-smooth snap-y snap-mandatory touch-pan-y overscroll-y-none">
       {/* Toast Notifications */}
       <Toast
