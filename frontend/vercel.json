@@ -1,0 +1,13 @@
+{
+  "functions": {
+    "src/app/api/download/route.ts": {
+      "maxDuration": 300
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/cleanup",
+      "schedule": "0 */6 * * *"
+    }
+  ]
+}

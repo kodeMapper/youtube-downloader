@@ -1,0 +1,9 @@
+@echo off
+echo Killing existing Node processes...
+taskkill /f /im node.exe >nul 2>&1
+echo Waiting for processes to close...
+timeout /t 3 /nobreak >nul
+echo Starting Next.js development server...
+cd /d "c:\Users\acer\Desktop\YouTube Downloader\frontend"
+npm run dev
+pause

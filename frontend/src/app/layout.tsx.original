@@ -1,0 +1,49 @@
+import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import "./globals.css";
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+export const metadata: Metadata = {
+  title: "YouTube Downloader - Fast & Reliable Video Downloads",
+  description: "Download YouTube videos quickly and easily with our bulletproof downloader. High-quality downloads, fast processing, and no registration required.",
+  keywords: "YouTube downloader, video download, YouTube videos, online video downloader",
+  openGraph: {
+    title: "YouTube Downloader - Fast & Reliable Video Downloads",
+    description: "Download YouTube videos quickly and easily with our bulletproof downloader.",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "YouTube Downloader - Fast & Reliable Video Downloads",
+    description: "Download YouTube videos quickly and easily with our bulletproof downloader.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="en">
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+      >
+        {children}
+      </body>
+    </html>
+  );
+}
