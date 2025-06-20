@@ -65,13 +65,13 @@ def download_video(url, output_dir):
     
     for format_selector in formats:
         for user_agent in user_agents:
-            try:
-                ydl_opts = {
+            try:                ydl_opts = {
                     'format': format_selector,
                     'outtmpl': os.path.join(output_dir, '%(title)s.%(ext)s'),
                     'http_headers': {'User-Agent': user_agent},
-                    'retries': 3,
-                    'fragment_retries': 3,
+                    'retries': 2,
+                    'fragment_retries': 2,
+                    'socket_timeout': 30,
                     'extractaudio': False,
                     'audioformat': 'mp3',
                     'restrictfilenames': True,
@@ -229,10 +229,9 @@ if __name__ == "__main__":
       await fs.promises.writeFile(pythonScript, pythonCode);
 
       console.log('Executing bulletproof downloader...');
-      
-      // Execute the Python script with timeout
+        // Execute the Python script with timeout
       const { stdout, stderr } = await execAsync(`python "${pythonScript}"`, {
-        timeout: 300000, // 5 minute timeout
+        timeout: 45000, // 45 second timeout to stay within Vercel limits
         maxBuffer: 1024 * 1024 * 50, // 50MB buffer
         cwd: tempDir
       });
