@@ -41,6 +41,8 @@ next-env.d.ts
 
 # YouTube Downloader specific
 /temp/
+/backup-legacy-files/
+/node_modules/
 *.mp4
 *.webm
 *.mkv
