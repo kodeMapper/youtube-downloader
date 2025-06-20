@@ -286,10 +286,10 @@ const handleDownload = async () => {
       const info = await infoResponse.json();
       setVideoInfo(info);
       setIsLoadingInfo(false);
-      setDownloadProgress(50);
-      setDownloadStatus('Getting download options...');
+      setDownloadProgress(25);
+      setDownloadStatus('Starting download...');
 
-      // Now get download options
+      // Try to download the video directly
       const downloadResponse = await fetch('/api/download', {
         method: 'POST',
         headers: {
@@ -301,21 +301,65 @@ const handleDownload = async () => {
         }),
       });
 
-      if (!downloadResponse.ok) {
-        const error = await downloadResponse.json();
-        throw new Error(error.error || 'Failed to get download options');
-      }
+      setDownloadProgress(75);
 
-      const downloadData = await downloadResponse.json();
-      setDownloadProgress(100);
-      setDownloadStatus('Opening download service...');
+      if (downloadResponse.ok) {
+        // Check if it's a direct file download or a fallback response
+        const contentType = downloadResponse.headers.get('content-type');
+        
+        if (contentType && contentType.startsWith('video/')) {
+          // Direct video download
+          setDownloadStatus('Processing video file...');
+          setDownloadProgress(90);
+          
+          const blob = await downloadResponse.blob();
+          
+          // Extract filename from Content-Disposition header or use video title
+          const contentDisposition = downloadResponse.headers.get('content-disposition');
+          let filename = 'video.mp4';
+          
+          if (contentDisposition) {
+            const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+            if (filenameMatch && filenameMatch[1]) {
+              filename = filenameMatch[1].replace(/['"]/g, '');
+            }
+          } else if (info.title) {
+            // Sanitize title for filename
+            filename = info.title.replace(/[^\w\s.-]/g, '').replace(/\s+/g, '_') + '.mp4';
+          }
 
-      // Open external download service
-      if (downloadData.downloadUrl) {
-        window.open(downloadData.downloadUrl, '_blank');
-        showToast('Opened download service in new tab', 'success');
+          // Create download link and trigger download
+          const downloadUrl = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = downloadUrl;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(downloadUrl);
+
+          setDownloadProgress(100);
+          setDownloadStatus('Download completed!');
+          showToast('Video downloaded successfully!', 'success');
+          
+        } else {
+          // Fallback response with external link
+          const fallbackData = await downloadResponse.json();
+          
+          if (fallbackData.fallback && fallbackData.downloadUrl) {
+            setDownloadProgress(100);
+            setDownloadStatus('Redirecting to external service...');
+            
+            window.open(fallbackData.downloadUrl, '_blank');
+            showToast('Opened external download service in new tab', 'info');
+          } else {
+            throw new Error('No download option available');
+          }
+        }
       } else {
-        throw new Error('No download link available');
+        // Error response
+        const error = await downloadResponse.json();
+        throw new Error(error.error || 'Download failed');
       }
 
       // Reset after showing success
