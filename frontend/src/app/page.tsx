@@ -242,8 +242,9 @@ export default function HomePage() {
       }
     } catch (error) {
       showToast('Failed to read clipboard', 'error');
-    }
-  };const handleDownload = async () => {
+    }  };
+
+const handleDownload = async () => {
     if (!url.trim()) {
       setDownloadStatus('Please enter a YouTube URL');
       showToast('Please enter a YouTube URL', 'error');
@@ -256,15 +257,17 @@ export default function HomePage() {
       setDownloadStatus('Please enter a valid YouTube URL');
       showToast('Please enter a valid YouTube URL', 'error');
       return;
-    }    setIsDownloading(true);
+    }
+
+    setIsDownloading(true);
     setDownloadProgress(0);
-    setDownloadStatus('');  // Don't show redundant status when we have loading visual
+    setDownloadStatus('');
     setVideoInfo(null);
     setIsLoadingInfo(true);
 
     try {
-      // First, get video info
-      const infoResponse = await fetch('/api/download', {
+      // First, try to get video info from the main API
+      let infoResponse = await fetch('/api/download', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -275,9 +278,87 @@ export default function HomePage() {
         }),
       });
 
+      let info;
+      let useFallback = false;
+
       if (!infoResponse.ok) {
-        const error = await infoResponse.json();
-        throw new Error(error.error || 'Failed to fetch video info');
+        // If main API fails, try fallback
+        console.log('Main API failed, trying fallback...');
+        const fallbackResponse = await fetch('/api/download-fallback', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            url: url.trim()
+          }),
+        });
+
+        if (!fallbackResponse.ok) {
+          const error = await fallbackResponse.json();
+          throw new Error(error.error || 'Failed to fetch video info');
+        }
+
+        info = await fallbackResponse.json();
+        useFallback = true;
+      } else {
+        info = await infoResponse.json();
+      }
+
+      setVideoInfo(info);
+      setIsLoadingInfo(false);
+      setDownloadProgress(25);
+
+      if (useFallback) {
+        // For fallback, provide external download link
+        setDownloadStatus('Using external download service...');
+        setDownloadProgress(75);
+        
+        // Open external download link
+        if (info.downloadUrl) {
+          window.open(info.downloadUrl, '_blank');
+          setDownloadProgress(100);
+          setDownloadStatus('Redirected to external download service');
+          showToast('Opened external download service in new tab', 'info');
+        } else {
+          throw new Error('No download link available');
+        }
+
+        // Reset after showing success
+        setTimeout(() => {
+          setIsDownloading(false);
+          setDownloadProgress(0);
+          setDownloadStatus('');
+          setUrl('');
+        }, 3000);
+        return;
+      }
+
+      // Continue with main API download
+      setDownloadStatus('Preparing download...');
+
+      const downloadResponse = await fetch('/api/download', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url: url.trim(),
+          infoOnly: false
+        }),
+      });
+
+      if (!downloadResponse.ok) {
+        const errorText = await downloadResponse.text();
+        let errorMessage = 'Download failed';
+        try {
+          const errorJson = JSON.parse(errorText);
+          errorMessage = errorJson.error || errorMessage;
+        } catch {
+          errorMessage = errorText || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
       }      const info = await infoResponse.json();
       setVideoInfo(info);
       setIsLoadingInfo(false);

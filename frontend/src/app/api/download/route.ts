@@ -23,77 +23,126 @@ function sanitizeFilename(filename: string): string {
   return filename.replace(/[^\w\s.-]/g, '').replace(/\s+/g, '_').trim();
 }
 
-// Create bulletproof Python downloader script
+// Alternative approach using direct HTTP requests for video extraction
+async function extractVideoInfo(url: string) {
+  try {
+    // Use a more lightweight approach to extract video information
+    const response = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`);
+    if (response.ok) {
+      const data = await response.json();
+      return {
+        title: data.title || 'Unknown Title',
+        author: data.author_name || 'Unknown Channel',
+        thumbnail: data.thumbnail_url || '',
+        duration: 0, // Not available in oembed
+        success: true
+      };
+    }
+    throw new Error('Failed to fetch video info');
+  } catch (error) {
+    console.error('Video info extraction failed:', error);
+    return { success: false, error: 'Failed to extract video information' };
+  }
+}
+
+// Create bulletproof Python downloader script with better error handling
 const createPythonDownloader = (url: string, outputDir: string) => `
 import subprocess
 import sys
 import os
+import json
 import time
-import importlib.util
 
 def install_package(package_name, upgrade=False):
     try:
         cmd = [sys.executable, "-m", "pip", "install"]
         if upgrade:
             cmd.append("--upgrade")
-        cmd.extend([package_name, "--no-cache-dir", "--quiet"])
-        subprocess.check_call(cmd, timeout=300)
-        return True
-    except:
+        cmd.extend([package_name, "--no-cache-dir", "--quiet", "--user"])
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+        return result.returncode == 0
+    except Exception as e:
+        print(f"Install error: {e}")
         return False
 
-def ensure_ytdlp():
-    if importlib.util.find_spec("yt_dlp") is None:
+def check_and_install_ytdlp():
+    try:
+        import yt_dlp
+        print("yt-dlp already available")
+        return True
+    except ImportError:
         print("Installing yt-dlp...")
-        if not install_package("yt-dlp"):
-            raise Exception("Failed to install yt-dlp")
-    else:
-        # Try to upgrade yt-dlp
-        install_package("yt-dlp", upgrade=True)
+        if install_package("yt-dlp"):
+            try:
+                import yt_dlp
+                return True
+            except ImportError:
+                return False
+        return False
 
-def download_video(url, output_dir):
-    ensure_ytdlp()
+def download_with_ytdlp(url, output_dir):
+    if not check_and_install_ytdlp():
+        raise Exception("Failed to install or import yt-dlp")
+    
     import yt_dlp
     
+    # Multiple user agents and format options for better compatibility
     user_agents = [
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     ]
     
-    formats = ['best[height<=720]', 'best[height<=480]', 'best', 'worst']
+    # Start with lower quality formats for better compatibility on serverless
+    formats = [
+        'best[height<=480][ext=mp4]',
+        'best[height<=720][ext=mp4]', 
+        'best[ext=mp4]',
+        'best[height<=480]',
+        'best'
+    ]
+    
+    last_error = None
     
     for format_selector in formats:
         for user_agent in user_agents:
-            try:                ydl_opts = {
+            try:
+                ydl_opts = {
                     'format': format_selector,
                     'outtmpl': os.path.join(output_dir, '%(title)s.%(ext)s'),
                     'http_headers': {'User-Agent': user_agent},
-                    'retries': 2,
-                    'fragment_retries': 2,
-                    'socket_timeout': 30,
-                    'extractaudio': False,
-                    'audioformat': 'mp3',
+                    'retries': 1,
+                    'fragment_retries': 1,
+                    'socket_timeout': 20,
                     'restrictfilenames': True,
                     'noplaylist': True,
                     'ignoreerrors': False,
                     'quiet': True,
-                    'no_warnings': True
+                    'no_warnings': True,
+                    'extract_flat': False,
+                    'prefer_ffmpeg': False
                 }
                 
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    # First try to extract info
+                    info = ydl.extract_info(url, download=False)
+                    if not info:
+                        continue
+                    
+                    # Then download
                     ydl.download([url])
                     return True
                     
             except Exception as e:
-                print(f"Attempt failed: {str(e)}")
+                last_error = str(e)
+                print(f"Attempt failed with format {format_selector}, UA {user_agent[:20]}...: {e}")
+                time.sleep(1)  # Brief pause between attempts
                 continue
-                
-    raise Exception("All download attempts failed")
+    
+    raise Exception(f"All download attempts failed. Last error: {last_error}")
 
 if __name__ == "__main__":
     try:
-        download_video("${url}", "${outputDir}")
+        download_with_ytdlp("${url}", "${outputDir}")
         print("SUCCESS")
     except Exception as e:
         print(f"ERROR: {str(e)}")
@@ -118,87 +167,14 @@ export async function POST(request: NextRequest) {
         { error: 'Invalid YouTube URL format' },
         { status: 400 }
       );
-    }
-
-    // If infoOnly is true, just fetch video info without downloading
+    }    // If infoOnly is true, just fetch video info without downloading
     if (infoOnly) {
-      try {
-        // Create temporary directory for info extraction
-        const tempId = uuidv4();
-        const tempDir = path.join(process.cwd(), 'temp', tempId);
-        await fs.promises.mkdir(tempDir, { recursive: true });
-        
-        // Create a Python script to just extract info
-        const pythonInfoCode = `
-import sys
-import os
-import json
-import importlib.util
-
-def install_package(package_name):
-    try:
-        import subprocess
-        subprocess.check_call([sys.executable, "-m", "pip", "install", package_name, "--quiet"])
-        return True
-    except:
-        return False
-
-if importlib.util.find_spec("yt_dlp") is None:
-    print("Installing yt-dlp...")
-    install_package("yt_dlp")
-
-import yt_dlp
-
-def get_video_info(url):
-    ydl_opts = {
-        'quiet': True,
-        'no_warnings': True,
-    }
-    
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=False)
-        return {
-            'title': info.get('title', 'Unknown Title'),
-            'duration': info.get('duration', 0),
-            'filesize': info.get('filesize', 0) or info.get('filesize_approx', 0),
-            'thumbnail': info.get('thumbnail', ''),
-            'formats': len(info.get('formats', [])),
-            'channel': info.get('channel', 'Unknown Channel'),
-            'upload_date': info.get('upload_date', ''),
-            'view_count': info.get('view_count', 0),
-        }
-
-if __name__ == "__main__":
-    try:
-        info = get_video_info("${url}")
-        print(json.dumps(info))
-    except Exception as e:
-        print(json.dumps({"error": str(e)}))
-`;
-        
-        const pythonInfoPath = path.join(tempDir, 'info_extractor.py');
-        await fs.promises.writeFile(pythonInfoPath, pythonInfoCode);
-        
-        // Execute the Python info script
-        const { stdout } = await execAsync(`python "${pythonInfoPath}"`, {
-          timeout: 30000, // 30 second timeout
-          cwd: tempDir
-        });
-        
-        try {
-          // Clean up temp dir
-          await fs.promises.rm(tempDir, { recursive: true, force: true });
-        } catch (cleanupError) {
-          console.error('Info cleanup error:', cleanupError);
-        }
-        
-        // Parse and return the video info
-        const videoInfo = JSON.parse(stdout);
+      const videoInfo = await extractVideoInfo(url);
+      if (videoInfo.success) {
         return NextResponse.json(videoInfo);
-      } catch (infoError) {
-        console.error('Video info extraction error:', infoError);
+      } else {
         return NextResponse.json(
-          { error: 'Failed to extract video information' },
+          { error: videoInfo.error || 'Failed to extract video information' },
           { status: 500 }
         );
       }
@@ -226,14 +202,14 @@ if __name__ == "__main__":
     try {
       // Create the Python downloader script
       const pythonCode = createPythonDownloader(url, tempDir.replace(/\\/g, '\\\\'));
-      await fs.promises.writeFile(pythonScript, pythonCode);
-
-      console.log('Executing bulletproof downloader...');
-        // Execute the Python script with timeout
-      const { stdout, stderr } = await execAsync(`python "${pythonScript}"`, {
-        timeout: 45000, // 45 second timeout to stay within Vercel limits
-        maxBuffer: 1024 * 1024 * 50, // 50MB buffer
-        cwd: tempDir
+      await fs.promises.writeFile(pythonScript, pythonCode);      console.log('Executing bulletproof downloader...');
+      
+      // Execute the Python script with extended timeout and better error handling
+      const { stdout, stderr } = await execAsync(`python3 "${pythonScript}" || python "${pythonScript}"`, {
+        timeout: 50000, // 50 second timeout
+        maxBuffer: 1024 * 1024 * 100, // 100MB buffer for larger videos
+        cwd: tempDir,
+        env: { ...process.env, PYTHONPATH: tempDir }
       });
 
       console.log('Python stdout:', stdout);
