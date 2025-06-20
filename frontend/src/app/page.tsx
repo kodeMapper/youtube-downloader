@@ -308,15 +308,14 @@ const handleDownload = async () => {
 
       const downloadData = await downloadResponse.json();
       setDownloadProgress(100);
-      setDownloadStatus('Download services ready!');
+      setDownloadStatus('Opening download service...');
 
-      // Show download services to user
-      if (downloadData.downloadServices && downloadData.downloadServices.length > 0) {
-        // Open the first download service
-        window.open(downloadData.downloadServices[0], '_blank');
-        showToast('Opened download service in new tab. Choose your preferred quality and download.', 'success');
+      // Open external download service
+      if (downloadData.downloadUrl) {
+        window.open(downloadData.downloadUrl, '_blank');
+        showToast('Opened download service in new tab', 'success');
       } else {
-        throw new Error('No download services available');
+        throw new Error('No download link available');
       }
 
       // Reset after showing success
@@ -336,7 +335,8 @@ const handleDownload = async () => {
       
       setTimeout(() => {
         setIsDownloading(false);
-        setDownloadProgress(0);        setDownloadStatus('');
+        setDownloadProgress(0);
+        setDownloadStatus('');
       }, 5000);
     }
   };
