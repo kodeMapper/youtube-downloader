@@ -261,13 +261,13 @@ const handleDownload = async () => {
 
     setIsDownloading(true);
     setDownloadProgress(0);
-    setDownloadStatus('');
+    setDownloadStatus('Fetching video information...');
     setVideoInfo(null);
     setIsLoadingInfo(true);
 
     try {
-      // First, try to get video info from the main API
-      let infoResponse = await fetch('/api/download', {
+      // Get video info first
+      const infoResponse = await fetch('/api/download', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -278,65 +278,18 @@ const handleDownload = async () => {
         }),
       });
 
-      let info;
-      let useFallback = false;
-
       if (!infoResponse.ok) {
-        // If main API fails, try fallback
-        console.log('Main API failed, trying fallback...');
-        const fallbackResponse = await fetch('/api/download-fallback', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            url: url.trim()
-          }),
-        });
-
-        if (!fallbackResponse.ok) {
-          const error = await fallbackResponse.json();
-          throw new Error(error.error || 'Failed to fetch video info');
-        }
-
-        info = await fallbackResponse.json();
-        useFallback = true;
-      } else {
-        info = await infoResponse.json();
+        const error = await infoResponse.json();
+        throw new Error(error.error || 'Failed to fetch video info');
       }
 
+      const info = await infoResponse.json();
       setVideoInfo(info);
       setIsLoadingInfo(false);
-      setDownloadProgress(25);
+      setDownloadProgress(50);
+      setDownloadStatus('Getting download options...');
 
-      if (useFallback) {
-        // For fallback, provide external download link
-        setDownloadStatus('Using external download service...');
-        setDownloadProgress(75);
-        
-        // Open external download link
-        if (info.downloadUrl) {
-          window.open(info.downloadUrl, '_blank');
-          setDownloadProgress(100);
-          setDownloadStatus('Redirected to external download service');
-          showToast('Opened external download service in new tab', 'info');
-        } else {
-          throw new Error('No download link available');
-        }
-
-        // Reset after showing success
-        setTimeout(() => {
-          setIsDownloading(false);
-          setDownloadProgress(0);
-          setDownloadStatus('');
-          setUrl('');
-        }, 3000);
-        return;
-      }
-
-      // Continue with main API download
-      setDownloadStatus('Preparing download...');
-
+      // Now get download options
       const downloadResponse = await fetch('/api/download', {
         method: 'POST',
         headers: {
@@ -349,59 +302,29 @@ const handleDownload = async () => {
       });
 
       if (!downloadResponse.ok) {
-        const errorText = await downloadResponse.text();
-        let errorMessage = 'Download failed';
-        try {
-          const errorJson = JSON.parse(errorText);
-          errorMessage = errorJson.error || errorMessage;
-        } catch {
-          errorMessage = errorText || errorMessage;
-        }
-        throw new Error(errorMessage);
+        const error = await downloadResponse.json();
+        throw new Error(error.error || 'Failed to get download options');
       }
 
-      setDownloadProgress(75);
-      setDownloadStatus('Processing download...');
-
-      // Get the video file as blob
-      const blob = await downloadResponse.blob();
-      
-      // Extract filename from Content-Disposition header or use video title
-      const contentDisposition = downloadResponse.headers.get('content-disposition');
-      let filename = 'video.mp4';
-      
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-        if (filenameMatch && filenameMatch[1]) {
-          filename = filenameMatch[1].replace(/['"]/g, '');
-        }
-      } else if (info.title) {
-        // Sanitize title for filename
-        filename = info.title.replace(/[^\w\s.-]/g, '').replace(/\s+/g, '_') + '.mp4';
-      }
-
-      // Create download link and trigger download
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = downloadUrl;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-
-      window.URL.revokeObjectURL(downloadUrl);
-
+      const downloadData = await downloadResponse.json();
       setDownloadProgress(100);
-      setDownloadStatus('Download completed!');
-      showToast('Download completed successfully!', 'success');
-      
-      // Reset after 3 seconds
+      setDownloadStatus('Download services ready!');
+
+      // Show download services to user
+      if (downloadData.downloadServices && downloadData.downloadServices.length > 0) {
+        // Open the first download service
+        window.open(downloadData.downloadServices[0], '_blank');
+        showToast('Opened download service in new tab. Choose your preferred quality and download.', 'success');
+      } else {
+        throw new Error('No download services available');
+      }
+
+      // Reset after showing success
       setTimeout(() => {
         setIsDownloading(false);
         setDownloadProgress(0);
         setDownloadStatus('');
-        setUrl(''); // Clear the URL field
-        setIsLoadingInfo(false);
+        setUrl('');
       }, 3000);
 
     } catch (error) {
@@ -413,9 +336,8 @@ const handleDownload = async () => {
       
       setTimeout(() => {
         setIsDownloading(false);
-        setDownloadProgress(0);
-        setDownloadStatus('');
-      }, 5000); // Show error longer
+        setDownloadProgress(0);        setDownloadStatus('');
+      }, 5000);
     }
   };
 
