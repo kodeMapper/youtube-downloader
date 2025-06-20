@@ -1,7 +1,8 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
-  "framework": "nextjs",  "functions": {
+  "framework": "nextjs",
+  "functions": {
     "src/app/api/download/route.ts": {
       "maxDuration": 60
     },
@@ -9,12 +10,6 @@
       "maxDuration": 30
     }
   },
-  "crons": [
-    {
-      "path": "/api/cleanup",
-      "schedule": "0 */6 * * *"
-    }
-  ],
   "headers": [
     {
       "source": "/api/(.*)",
