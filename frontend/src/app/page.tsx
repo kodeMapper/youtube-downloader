@@ -8,6 +8,8 @@ import ScrollIndicator from '../components/ScrollIndicator';
 import ModernLoader from '../components/ModernLoader';
 import useSwipe from '../hooks/useSwipe';
 
+// Updated for deployment - latest version
+
 // Helper function to format duration
 function formatDuration(seconds: number): string {
   if (!seconds) return 'Unknown';
