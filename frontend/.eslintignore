@@ -1,0 +1,8 @@
+node_modules/
+.next/
+backup-legacy-files/
+temp/
+*.backup.*
+*.old.*
+out/
+build/

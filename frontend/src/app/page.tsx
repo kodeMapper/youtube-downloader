@@ -282,9 +282,7 @@ export default function HomePage() {
       setVideoInfo(info);
       setIsLoadingInfo(false);
       setDownloadStatus('Preparing download...');
-      setDownloadProgress(25);
-
-      // Then start the actual download
+      setDownloadProgress(25);      // Then start the actual download
       const downloadResponse = await fetch('/api/download', {
         method: 'POST',
         headers: {
@@ -311,44 +309,50 @@ export default function HomePage() {
       setDownloadProgress(75);
       setDownloadStatus('Processing download...');
 
-      // Get the video file as blob
-      const blob = await downloadResponse.blob();
-      
-      // Extract filename from Content-Disposition header or use video title
-      const contentDisposition = downloadResponse.headers.get('content-disposition');
-      let filename = 'video.mp4';
-      
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-        if (filenameMatch && filenameMatch[1]) {
-          filename = filenameMatch[1].replace(/['"]/g, '');
+      const contentType = downloadResponse.headers.get('Content-Type');
+      if (contentType && contentType.includes('application/json')) {
+        const downloadData = await downloadResponse.json();
+        if (downloadData.type === 'redirect') {
+          setDownloadProgress(100);
+          setDownloadStatus('Redirecting to download service...');
+          window.open(downloadData.downloadUrl, '_blank');
+        } else {
+          throw new Error('Unexpected response type');
         }
-      } else if (info.title) {
-        // Sanitize title for filename
-        filename = info.title.replace(/[^\w\s.-]/g, '').replace(/\s+/g, '_') + '.mp4';
+      } else {
+        const blob = await downloadResponse.blob();
+        const contentDisposition = downloadResponse.headers.get('Content-Disposition');
+        let filename = 'video.mp4';
+
+        if (contentDisposition) {
+          const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+          if (filenameMatch && filenameMatch[1]) {
+            filename = filenameMatch[1].replace(/['"]/g, '');
+          }
+        }
+
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(downloadUrl);
+
+        setDownloadProgress(100);
+        setDownloadStatus('Download completed!');
+        showToast('Download completed successfully!', 'success');
+
+        // Reset the input field and states after a short delay
+        setTimeout(() => {
+          setIsDownloading(false);
+          setDownloadProgress(0);
+          setDownloadStatus('');
+          setUrl(''); // Clear the URL field
+          setIsLoadingInfo(false);
+        }, 3000);
       }
-
-      // Create download link and trigger download
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = downloadUrl;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);      window.URL.revokeObjectURL(downloadUrl);
-
-      setDownloadProgress(100);
-      setDownloadStatus('Download completed!');
-      showToast('Download completed successfully!', 'success');
-      
-      // Reset after 3 seconds
-      setTimeout(() => {
-        setIsDownloading(false);
-        setDownloadProgress(0);
-        setDownloadStatus('');
-        setUrl(''); // Clear the URL field
-        setIsLoadingInfo(false);
-      }, 3000);
 
     } catch (error) {
       console.error('Download error:', error);
